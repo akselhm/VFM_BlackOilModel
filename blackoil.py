@@ -156,6 +156,8 @@ class black_oil:
     def B_g_func(self, rho_g):
         return self.rho_g0/rho_g
 
+    def rho_w_func(self, B_w):
+        return self.rho_w0/B_w
 
     def rho_g_func(self, P, Z_g):
         # gas density   (eq 28)
