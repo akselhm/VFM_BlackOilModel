@@ -7,4 +7,5 @@ class Pipe:
         self.D = D  #diameter
         self.eps = eps #wall rougness
         self.N = N
-        x = np.linspace(0, length, N) # horizontal grid with N cells
+        self.x = np.linspace(0, length, N) # horizontal grid with N cells
+        self.dx = length/N

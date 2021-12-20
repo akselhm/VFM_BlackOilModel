@@ -1,24 +1,6 @@
 import numpy as np
-"""
-# input data from tab 2 and 3
 
-API = 29.05         #API gravity (denoted gamma_API in tab)
-gamma_g0 = 0.83     #gas specific gravity at SC
-T_r = 333           #reservoir temperature
-P_b = 340*10**5     # bubble pressure at T_r
-GOR =196.4          #gas-oil ratio
-GORI =[]            #injection gas oil-ratio
-WOR =15.6           #water-oil ratio
-P_plat =22.2*10**5  # pressure at platform
-P_WCT =104.6*10**5  # pressure at WCT (used for testing)
-T_k =T_r            # temperature at WCT 
-j_o0 = 0.6860       # oil superficial velocity at SC
-eps = 0.00021       # roughness
-D = 0.1524          # pipe diameter
 
-gamma_g = gamma_g0 # from eq. 30
-
-"""
 class black_oil:
     #the black oil model. Initial imput values from tab 2 and 3 (changed now)
     # change input to GOR, water cut, p_bp, t_bp, standard density of oil, gas and water and gas specific gravity to calculate the fluid properties
@@ -43,7 +25,7 @@ class black_oil:
         self.gamma_o0 = self.rho_o0 / self.rho_w0  # specific gravity of oil (from Timurs code)(eq 23)
         self.API = 141.5 / self.gamma_o0 - 131.5         #API gravity (denoted gamma_API in tab)(eq 22)
 
-        # -- from Appendix A (black oil correlations) ---
+        # -- from Appendix A Andreolli (black oil correlations) ---
         # input from tab A.5 (black oil model)
 
         self.C_gas = 8.314   # universial gas constant (denoted /\ )
@@ -113,7 +95,7 @@ class black_oil:
         #oil viscosity (eq A.17+)
         m1 = 10**(0.43 + 8.33/self.API)
         u_od = self.C4*(0.32 + (1.8*10**7)/(self.API**4.53))*(360/(self.C3+200))**m1 
-        if P <= self.P_atm:    #P==P_atm in paper
+        if P <= self.P_atm:    #P==P_atm in paper (not specified for pressure lower than P_atm)
             return u_od 
         else:
             k5 = (u_od/self.C4)**(5.44*(self.C1*R_so+150)**(-0.338))
