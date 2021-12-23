@@ -9,23 +9,23 @@ from VFM import TH_model
 # black oil
 GOR = 50.0  #[-]
 wc = 0.30   #[-]
-p_bp = 50.0e5   #[Pa] ?
+p_bp = 50.0e5   #[Pa] !!
 t_bp = 20.0 + 273.15 # [K]
-rho_o0 = 1100 #867.0  #[..] unit 
-rho_g0 = 0.997
-rho_w0 = 1200.0
-gamma_g0 = 0.799
+rho_o0 = 867.0  #[kg/m^3] Note: this is changed to fulfill the requirement of API<45
+rho_g0 = 0.997      #[kg/m^3]
+rho_w0 = 1020.0     #[kg/m^3]
+gamma_g0 = 0.799    # [-]
 T_r = 25 + 273.15    # [K] included in black oil as it is constant
 
 #pipe
 D = 0.2     # [m]
-eps = 5e-3# 0.005 # [m]
-length = 5000   # [m]
-N = 100000 
+eps = 3e-5 #5e-3# 0.005 # [m]
+length = 1000   # [m]
+N = 10000 
 
 # thermal-hydraulic model
-q_l_in = 1.5*0.157726   # [..] unit
-p_out = 10e5    # [Pa] ?
+q_l_in = 0.157726   # [..] unit
+p_out = 10e5    # [Pa] 
 #void_frac_method = "Bendiksen" 
 twophase_ff_method = "VG"
 
@@ -108,10 +108,18 @@ def computePipe(pressures, void_frac_method):
 BWOR_list, Bwc_list, Bvoid_frac_list, Boil_frac_list, Bq_l_list, Bq_w_list, Bq_g_list, Bq_o_list = computePipe(B_pressures, "Bendiksen")
 WGWOR_list, WGwc_list, WGvoid_frac_list, WGoil_frac_list, WGq_l_list, WGq_w_list, WGq_g_list, WGq_o_list = computePipe(B_pressures, "VG")
 
+# print pressures at input
+print("pressure at input with Bendiksen is :", B_pressures[0])
+print("pressure at input with Woldesmayat and Gajar is :", WG_pressures[0])
+
+print(" the pressure difference with Bendiksen is: ", (B_pressures[0]- B_pressures[-1])/100000, "bar")
+print(" the pressure difference with W&G is: ", (WG_pressures[0]- WG_pressures[-1])/100000, "bar")
+
 # ------- plotting ----------
 x_list = pipe.x
 # -- plot the pressure through the pipe --
 fig = plt.figure()
+plt.title('Pressure through pipe')
 plt.plot(x_list, B_pressures, 'b--', label='Bendiksen')
 plt.plot(x_list, WG_pressures, 'r-.', label='Woldesmayat and Ghajar')
 plt.ylabel('Pressure [Pa]')
@@ -121,16 +129,28 @@ fig.savefig('results/pressureplot.png')
 
 # -- void fraction --
 fig = plt.figure()
+plt.title('Void fraction through pipe')
 plt.plot(x_list, Bvoid_frac_list, 'b--', label='Bendiksen')
 plt.plot(x_list, WGvoid_frac_list, 'r-.', label='Woldesmayat and Ghajar')
 plt.ylim(ymax = 1, ymin = 0)
-plt.ylabel('Void fraction [Pa]')
+plt.ylabel('Void fraction [-]')
 plt.xlabel('Position [m]')
 plt.legend()
 fig.savefig('results/voidfractionplot.png')
 
+fig = plt.figure()
+plt.title('Void fraction through pipe (zoomed)')
+plt.plot(x_list, Bvoid_frac_list, 'b--', label='Bendiksen')
+plt.plot(x_list, WGvoid_frac_list, 'r-.', label='Woldesmayat and Ghajar')
+#plt.ylim(ymax = 1, ymin = 0)
+plt.ylabel('Void fraction [-]')
+plt.xlabel('Position [m]')
+plt.legend()
+fig.savefig('results/voidfractionplotzoomed.png')
+
 # -- oil fraction --
 fig = plt.figure()
+plt.title('Oil fraction through pipe')
 plt.plot(x_list, Boil_frac_list, 'b--', label='Bendiksen')
 plt.plot(x_list, WGoil_frac_list, 'r-.', label='Woldesmayat and Ghajar')
 plt.ylim(ymax = 1, ymin = 0)
@@ -139,8 +159,19 @@ plt.xlabel('Position [m]')
 plt.legend()
 fig.savefig('results/oilfractionplot.png')
 
+fig = plt.figure()
+plt.title('Oil fraction through pipe (zoomed)')
+plt.plot(x_list, Boil_frac_list, 'b--', label='Bendiksen')
+plt.plot(x_list, WGoil_frac_list, 'r-.', label='Woldesmayat and Ghajar')
+#plt.ylim(ymax = 1, ymin = 0)
+plt.ylabel('Oil Fraction [-]')
+plt.xlabel('Position [m]')
+plt.legend()
+fig.savefig('results/oilfractionplotzoomed.png')
+
 # -- wc (should be constant) --
 fig = plt.figure()
+plt.title('Water Cut through pipe')
 plt.plot(x_list, Bwc_list, 'b--', label='Bendiksen')
 plt.plot(x_list, WGwc_list, 'r-.', label='Woldesmayat and Ghajar')
 plt.ylim(ymax = 1, ymin = 0)
@@ -148,3 +179,13 @@ plt.ylabel('Water Cut[-]')
 plt.xlabel('Position [m]')
 plt.legend()
 fig.savefig('results/wcplot.png')
+
+fig = plt.figure()
+plt.title('Water Cut through pipe (zoomed)')
+plt.plot(x_list, Bwc_list, 'b--', label='Bendiksen')
+plt.plot(x_list, WGwc_list, 'r-.', label='Woldesmayat and Ghajar')
+plt.ylabel('Water Cut[-]')
+plt.xlabel('Position [m]')
+plt.legend()
+fig.savefig('results/wcplotzoomed.png')
+

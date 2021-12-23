@@ -29,7 +29,7 @@ class TH_model:
         self.urf = 0.1 #under relaxation factor
 
         # Compute superficial oil velocity at standard conditions (found from Timurs code: NewPipe line 169)
-        self.j_o0 = (1 - self.fluid.wc) * self.q_l_in0 / self.pipe.D #might have to change q_liq_in
+        self.j_o0 = (1 - self.fluid.wc) * self.q_l_in0 / (self.pipe.D**2 * np.pi/4) #might have to change q_liq_in
 
 
     def massFlux_func(self, rho_l, rho_g, j_l, j_g):
@@ -144,7 +144,7 @@ class TH_model:
         B_o = self.fluid.B_o_func(P_i, R_so)
         B_w = self.fluid.B_w_func(P_i)
         Z_g = self.fluid.Z_g_func(P_i)
-        R_sl = self.fluid.R_so_func(R_so)
+        R_sl = self.fluid.R_sl_func(R_so)
         B_l = self.fluid.B_l_func(B_w, B_o)
         
         #returned from mass eqs
