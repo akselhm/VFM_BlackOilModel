@@ -23,9 +23,10 @@ pplfilename = 'inputOLGAtest.ppl'
 
 size = 5            #size of dataset (Expand when it works)
 number_of_vars = 6  #number of variables to extract to the dataset. Change when you know this
+column_names = ["inlet pressure [bara]", "outlet pressure [bara]", "oil inlet flowrate [Sm3/s]", "oil outlet flowrate [Sm3/s]", "gas outlet flowrate [Sm3/s]", "water outlet flowrate [Sm3/s]"] #change if changing the variables selected
+
 
 dataset = np.zeros((size, number_of_vars)) 
-#TODO: change to pd dataframe ?
 
 #define range of the variables
 min_qo_in = 0.01    # [sm3/s] change when you know what values you want
@@ -80,6 +81,7 @@ for i in range(size):
     qw_out = water_flowrate[-1][-1] #last timestep last value 
 
     #make array of values
+
     arr = np.array([p_in, p_out, qo_in, qo_out, qg_out, qw_out]) #TODO: add additional values if needed
 
     #add values to dataset
@@ -87,7 +89,12 @@ for i in range(size):
 
 print(dataset)
 
-#TODO: -- Generate a csv file from the dataframe --
+# create dataframe from numpy array with dataset
+df = pd.DataFrame(data = dataset,
+columns = column_names)
+
+# Generate a csv file from the dataframe
+df.to_csv("data/dataset.csv")
 
 
 exit()
