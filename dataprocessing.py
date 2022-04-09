@@ -1,163 +1,147 @@
 #file for creating, loading and pre-processing the OLGA data
 #uses an inp-file to create an OLGA-model and a bat-file to run the case. Retrieves the data from the generated ppl-file. The inp-file is modified between each run in a loop.
 
-import pyfas as fa
+#OPTIONS
+change_pressure=True #deside if input pressure should be changed
+skewed_ql_in = False #decide if data set should be evenly distibuted w.r.t inlet liquid (oil) flowrate or not. Example of skewed dataset: 10% - [0.05 - 0.15] m3/s and 90% - [0.15 - 0.25] m3/s
+
+#TODO: change pressures from bara to Pa here and in inp-file
+#TODO: select what parameters is wanted from the ppl-file and expand size of dataset
+
+
+import pyfas as fa  # library to extract results from ppl file
 import pandas as pd
-import subprocess #to run batchfile
-import matplotlib.pyplot as plt
+import subprocess   # to run batchfile
+import matplotlib.pyplot as plt #not needed atm
 import numpy as np
-import os
-pd.options.display.max_colwidth = 120
+pd.options.display.max_colwidth = 120 #needed(?) for the dataframes created from ppl-objects (pyfas)
 
 # - load files - 
 
-ppl_path = 'C:/Users/aksel/NTNU/Prosjektoppgave/OLGA-filer/' # fullstendig bane: C:\Users\aksel\NTNU\Prosjektoppgave\OLGA-filer
-path = 'C:/Users/aksel/NTNU/Prosjektoppgave/VFM_BlackOilModel/' #do not need anymore as all files are in same folder
-inpfilename = 'inputOLGAtest.inp'#'OLGAinputPython.txt' #OLGA inp.-file as .txt-file (change name if needed)
-pplfilename = 'inputOLGAtest.ppl'
-#ppl = fa.Ppl(ppl_path+pplfilename) 
+path = 'C:/Users/aksel/NTNU/Prosjektoppgave/VFM_BlackOilModel/' # .. do not really need anymore as all files are in same folder 
+inpfilename = 'inputOLGAtest.inp' # name of input file used to create OLGA-object
+pplfilename = 'inputOLGAtest.ppl'   #name of output file
 
-#TODO: generate data: 1) modify input.txt file and rename to input.inp 2) run modified input file via bat file 3) extract results and add to dataset
 
-# -- Sceleton-code to the full task of creating the dataset --
+# Steps for generating data: 1) modify input file with new variables 2) run modified input file via bat file 3) extract results from ppl file and add to dataset
 
-size = 5            #size of dataset (Expand when it works)
-number_of_vars = 6  #number of variables to extract to the dataset. Change when you know this
-column_names = ["inlet pressure [bara]", "outlet pressure [bara]", "oil inlet flowrate [Sm3/s]", "oil outlet flowrate [Sm3/s]", "gas outlet flowrate [Sm3/s]", "water outlet flowrate [Sm3/s]"] #change if changing the variables selected
+size = 35            #size of dataset (TODO: Expand whenever you want) (got error message if above 350)
+number_of_vars = 10  #number of variables to extract to the dataset. Change when you know this
+column_names = ["inlet pressure [Pa]", 
+    "outlet pressure [Pa]", 
+    "inlet oil flowrate [m3/s]", 
+    "outlet oil flowrate [m3/s]",
+    "inlet gas flowrate [m3/s]", 
+    "outlet gas flowrate [m3/s]",
+    "inlet water flowrate [m3/s]", 
+    "outlet water flowrate [m3/s]",
+    "inlet holdup [-]",
+    "outlet holdup [-]"] #change if changing the variables selected
 
 
 dataset = np.zeros((size, number_of_vars)) 
 
-#define range of the variables
-min_qo_in = 0.01    # [sm3/s] change when you know what values you want
-max_qo_in = 0.1     # [sm3/s] change when you know what values you want
-min_p_out = 10      # [bara] --""-- (change to pascal)
-max_p_out = 50      # [bara] --""--
+
+
+#define range of the variables that chould be changed
+wc = 0.3 #water cut (use same as in OLGA-file)
+min_ql_in = 0.05    # [Sm3/s] 
+max_ql_in = 0.25     # [Sm3/s]
+if change_pressure == True:
+    min_p_out = 5*10**5     # [Pa] (deside on range)
+    max_p_out = 15*10**5     # [Pa] 
+
+#make skewed data set so that: x% - [0.05 - 0.15] m3/s and (100-x)% - [0.15 - 0.25] m3/s
+if skewed_ql_in== True:
+    split = 0.1 #determines how large portion of the data set should be in lower range of the values
+    max_ql_in_low = 0.15    # [Sm3/s] maximum value for low input flowrate dataset
+    min_ql_in_high = 0.15   # [Sm3/s] minmum value for high input flowrate dataset
 
 # -- Loop for generating data --
 for i in range(size):
-    #generate random inlet oil flowrate and outlet pressure
-    qo_in = np.random.uniform(min_qo_in, max_qo_in)
-    p_out = np.random.uniform(min_p_out, max_p_out)
 
-    # -- STEP ONE: modify input file to have new flowrate and pressure (and other parameters if wanted)
+    print("Iteration at: ", i, " out of ", size)
+    #Generate random inlet oil flowrate and outlet pressure
+
+    #Flowrate
+    if skewed_ql_in == True:    #make skewed dataset
+        distribution_parameter = np.random.uniform(0, 1)
+        if distribution_parameter < split: #generate data in the lower range of ql_in
+            ql_in = np.random.uniform(min_ql_in, max_ql_in_low)
+        else:   #generate data in the hogher range of ql_in
+            ql_in = np.random.uniform(min_ql_in_high, max_ql_in)
+    else:   #make evenly distributed values for ql_in
+        ql_in = np.random.uniform(min_ql_in, max_ql_in)
+    #Change from liquid inlet flow rate to oil inlet flow rate
+    qo_in0 = (1-wc)*ql_in #standard inlet oil flow rate
+
+    #Pressure
+    if change_pressure ==True:
+        p_out = np.random.uniform(min_p_out, max_p_out)
+
+    # -- STEP ONE: modify input file to have new flowrate and pressure (and other parameters if wanted) --
     
     inputfile = open(path+inpfilename, "r")
     lines = inputfile.readlines()
     #change inlet oil flowrate
-    lines[47] = "        FEEDNAME=Bofluid, PHASE=OIL, FEEDSTDFLOW={} Sm3/s \n".format(qo_in)
+    lines[47] = "        FEEDNAME=Bofluid, PHASE=OIL, FEEDSTDFLOW={} Sm3/s \n".format(qo_in0)
     #change outlet pressure
-    lines[70] = "        TEMPERATURE=25 C, PRESSURE={} bara, FLUID=Bofluid \n".format(p_out) 
+    if change_pressure == True:
+        lines[70] = "        TEMPERATURE=25 C, PRESSURE={} Pa, FLUID=Bofluid \n".format(p_out) 
     inputfile.close()
 
     inputfile = open(path+inpfilename, "w")
     inputfile.writelines(lines)
     inputfile.close()
 
-    # -- STEP TWO: run the modified input file from batch file
+    # -- STEP TWO: run the modified input file from batch file --
     subprocess.call([r'C:/Users/aksel/NTNU/Prosjektoppgave/VFM_BlackOilModel/testbatchfile.bat']) #run inputfile via batchfile
 
-    # -- STEP THREE: extract data and add to dataset (keep control of how many variables you have in each )
-    ppl = fa.Ppl(path+pplfilename) #create ppl-object (change file name if necessary)
+    # -- STEP THREE: extract data and add to dataset (keep control of how many variables you have in each ) --
+    ppl = fa.Ppl(path+pplfilename) #create ppl-object 
     
     # pressure
     ppl.extract(15) #extract the pressures to the ppl object
     pressures = ppl.data[15][1] # save the pressures to array
-    p_in = pressures[-1][1] #last timestep "first" value (disregard value at pos. 0)
+    p_in = pressures[-1][1] #last timestep, "first" value (disregard value at pos. 0)
+    if change_pressure == False:
+        p_out = pressures[-1][-1] # or give the specified value directly if known in advanced (as it is not supposed to change) (NOTE: outlet in ppl is currently not giving the same value as specified in the inp-file)
 
+    # Flow rates (extract at local conditions, not standard) #NOTE:!!!!
     # gas voulme flow
     ppl.extract(3)
     gas_flow = ppl.data[3][1] # save the pressures to array
-    qg_out = gas_flow[-1][-1] #last timestep last value 
+    qg_in = gas_flow[-1][1] #last timestep, first value 
+    qg_out = gas_flow[-1][-1] #last timestep, last value 
 
     # Volumetric flow rate oil
     ppl.extract(5)
     oil_flowrate = ppl.data[5][1] # save the pressures to array
-    qo_out = oil_flowrate[-1][-1] #last timestep last value 
+    qo_in = oil_flowrate[-1][1] #last timestep, first value 
+    qo_out = oil_flowrate[-1][-1] #last timestep, last value 
 
     # Volumetric flow rate water
-    ppl.extract(5)
-    water_flowrate = ppl.data[5][1] # save the pressures to array
-    qw_out = water_flowrate[-1][-1] #last timestep last value 
+    ppl.extract(6)
+    water_flowrate = ppl.data[6][1] # save the pressures to array
+    qw_in = water_flowrate[-1][1] #last timestep, last value
+    qw_out = water_flowrate[-1][-1] #last timestep, last value 
+
+    # Holdup (use to derive void fraction for MLE)
+    ppl.extract(13)
+    holdup = ppl.data[13][1]    # save the holdup to array
+    hol_in = holdup[-1][1]      # last timestep, first value
+    hol_out = holdup[-1][-1]    # last timestep, last value
 
     #make array of values
-
-    arr = np.array([p_in, p_out, qo_in, qo_out, qg_out, qw_out]) #TODO: add additional values if needed
+    arr = np.array([p_in, p_out, qo_in, qo_out, qg_in, qg_out, qw_in, qw_out, hol_in, hol_out]) #TODO: add additional values if needed
 
     #add values to dataset
     dataset[i] = arr
 
-print(dataset)
 
 # create dataframe from numpy array with dataset
 df = pd.DataFrame(data = dataset,
 columns = column_names)
 
-# Generate a csv file from the dataframe
-df.to_csv("data/dataset.csv")
-
-
-exit()
-
-# -- Testing all steps --
-# STEP 1) modify input file, copy, read as string
-
-inputfile = open(ppl_path+inpfilename, "r")
-lines = inputfile.readlines()
-lines[46] = "        FEEDNAME=Bofluid, PHASE=OIL, FEEDSTDFLOW={} Sm3/s \n".format(0.5) #change 0.5 to the flowrate that is desired
-inputfile.close()
-
-inputfile = open(ppl_path+inpfilename, "w")
-inputfile.writelines(lines)
-inputfile.close()
-
-"""
-inputfile = open(path+pplfilename, "r") #change path later ...
-lines = inputfile.readlines()
-lines[46] = "changed line" #test if the changes are made
-#lines[46]= "PARAMETERS LABEL=NODE_3, TYPE=MASSFLOW, FEEDNAME=Bofluid, PHASE=OIL, FEEDSTDFLOW={} Sm3/s, \ \n".format(feedflow_std[i])
-inputfile.close()
-
-inputfile = open(ppl_path+pplfilename, "w")
-inputfile.writelines(lines)
-#print()
-print(lines[3:5])
-print(lines[45:47])
-
-inputfile.close()
-
-#rename files from .txt to .inp (adapted from Md Rizwan) NOT NEEDED ANYMORE
-folder = "C:/Users/aksel/NTNU/Prosjektoppgave/VFM_BlackOilModel"
-filename = 'OLGAinputPython.txt'
-for filename in os.listdir(folder):
-    infilename = os.path.join(folder,filename)
-    if not os.path.isfile(infilename): continue
-    oldbase = os.path.splitext(filename)
-    newname = infilename.replace('.txt', '.inp')
-    output = os.rename(infilename, newname)
-"""
-
-# STEP 2) run modified input file from bat-file
-
-#subprocess.call([r'C:/Users/aksel/NTNU/Prosjektoppgave/OLGA-filer/testbatchfile.bat'])
-subprocess.call([r'C:/Users/aksel/NTNU/Prosjektoppgave/VFM_BlackOilModel/testbatchfile.bat'])
-# current error: tries to run the inp-file from "this" folder and not the folder defined in the bat-file
-#possible solution: relocate bat-file and input file to current folder. (also modify the "call" to reflect this folder) SUCSESS
-
-
-exit()
-# - filter trends - 
-
-#print(ppl.filter_data("PT"))
-
-#print(pd.DataFrame(ppl.filter_data('PT'), index=("Profiles",)).T)
-
-# - Extract data -
-
-ppl.extract(15) #extract the pressures to the ppl object
-pressures = ppl.data[15][1] # save the pressures to array
-
-print(pressures[-1]) #print the pressures from the last time step
-
-
-    
+# Generate a csv file from the dataframe and save to data-folder
+df.to_csv("data/dataset.csv", index=False)
