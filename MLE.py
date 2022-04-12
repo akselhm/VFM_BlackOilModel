@@ -11,10 +11,9 @@ from scipy.optimize import minimize
 
 from Pipe import Pipe
 
-#TODO: handle dataset: split, etc.. (not sure that initially should be done here or somewhere else, like in main)
+plot_void_fractions = True
 
-#TODO: visualize data. plot void fraction as a function of pressure and as a function of oil flow rate
-
+#TODO: handle dataset: split, etc.. (not sure that initially should be done here or somewhere else, like in main or datprocessing)
 """
 df = pd.read_csv ('data/dataset1.csv', usecols= ['outlet oil flowrate [Sm3/s]','outlet holdup [-]'])
 
@@ -43,7 +42,8 @@ print(type(array))
 """
 
 # -- Make dataset containing both values at inlet and outlet--
-#M ake dataframes for values at inlet and outlet 
+
+# Make dataframes for values at inlet and outlet 
 df_out = pd.read_csv ('data/dataset0.csv', usecols= ["outlet pressure [Pa]", 
     "outlet oil flowrate [m3/s]",
     "outlet gas flowrate [m3/s]",
@@ -67,15 +67,15 @@ df_in.columns = ["pressure [Pa]",
     "water flowrate [m3/s]", 
     "holdup [-]"]
 
-# Concatenate dataframes
+# Concatenate dataframes 
 df = pd.concat([df_in, df_out])
-print(df.head)
+#print(df.head)
 
 # Add void fraction as 1 - holdup
 holdups = df.loc[:,"holdup [-]"]
 holdups = holdups.to_numpy()
 void_fractions = 1- holdups[:]
-#TODO: add to df
+#TODO: add to df?
 
 # -- Make a prediction of the void fraction based on the parameters (P, q_i, j_i, ..?) --
 # Retrieve pressures and flow rates
@@ -119,45 +119,41 @@ def Hughmark_arr(oil_flowrates, water_flowrates, gas_flowrates):
 
 Hughmark_void_fractions = Hughmark_arr(oil_flowrates, water_flowrates, gas_flowrates)
 
+#add residual to Hughmark_array
+e = np.random.normal(0,0.02, 70)
+Hughmark_void_fractions+= e
+
 #TODO: add pred_void_fractions to dataframe (or make new with only void_fractions and pred_void_fractions?)
 
-"""
-Fr_j = j/(np.sqrt(9.81*self.pipe.D))
-if Fr_j < 3.5:
-    Cd = 1.05 #...+ 0.15*np.sin(angle)
-    Ud = np.sqrt(9.81*self.pipe.D)*0.54 #np.sqrt(g_s*D)*(0.35*np.sin(angle) + 0.54*np.cos(angle))
-else: #Fr_j >= 3.5
-    Cd = 1.2
-    Ud = 0 #0.35*np.sqrt(9.81*self.pipe.D)*np.sin(angle)
-return Cd, Ud
-"""
+#Examine the relationship between the predicted value of the void fraction from data Y compared to the actual void fraction given from data Y
 
-
-#TODO: Examine the relationship between the predicted value of the void fraction from data Y compared to the actual void fraction given from data Y
-
-#make a plot similar to the one above, only that this hopefully will provide more information
-plt.scatter(Hughmark_void_fractions, void_fractions, c ="blue", marker="x")
-plt.savefig('results/HugmarkVSvoidfracs.png')
-
-exit()
+if plot_void_fractions:
+    fig = plt.figure()
+    plt.scatter(Hughmark_void_fractions, void_fractions, c ="blue", marker="x")
+    plt.title("Measured vs predicted void fractions based on flow rates and pressure")
+    plt.ylabel('Actual void fractions (from OLGA)')
+    plt.xlabel('Predicted void fractions using the Hughmark correlation')
+    fig.savefig('results/HugmarkVSvoidfracs.png')
 
 #TODO: define an MLE function containing: (I) the model building equation and (II) the logarithmic value of the probability density function
 
-y = 1 #data array (initially set to 1)
 #Sceleton for MLE-function
 def MLE(parameters):
     #extract parameters
-    const, beta1, beta2, V = parameters #not sure if this works with a covariate matrix V (also, what is the difference between V_0 and V?)
+    const, beta, std_dev = parameters 
     #predict the output
-    pred = const #+++
+    pred = const + beta*Hughmark_void_fractions #make a prediction of the void_fraction based on 
     #calculate the log-likelihood for given distribution (most likely multivariate normal distribution)
-    LL = np.sum(stats.multivariate_normal.logpdf(y, pred, V))
+    LL = np.sum(stats.norm.logpdf(void_fractions, pred, std_dev))
     #negative log-likelihood (to minimize)
     neg_LL = -1*LL
     return neg_LL
 
-MLE_function = MLE(y)
-#TODO: minimize the negative log-likelihood
+# Initialize a guess of the parameters: (const, beta, std_dev)
+arr= np.array([0.05, 1.0, 0.02]) #sensitive to first guess
 
-arr= np.array([0,0])
-mlemodel = minimize(MLE_function, arr, method=...)
+# Minimize the negative log-likelihood
+mlemodel = minimize(MLE, arr, method='L-BFGS-B')
+
+print("MLE converged: ", mlemodel.success)
+print("parameters are: ", mlemodel.x)
