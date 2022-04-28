@@ -4,9 +4,10 @@
 #OPTIONS
 change_pressure=True #deside if input pressure should be changed
 skewed_ql_in = False #decide if data set should be evenly distibuted w.r.t inlet liquid (oil) flowrate or not. Example of skewed dataset: 10% - [0.05 - 0.15] m3/s and 90% - [0.15 - 0.25] m3/s
+add_noise = True
 
-#TODO: change pressures from bara to Pa here and in inp-file
 #TODO: select what parameters is wanted from the ppl-file and expand size of dataset
+#TODO: add noise to dataset (!!!)
 
 
 import pyfas as fa  # library to extract results from ppl file
@@ -25,7 +26,7 @@ pplfilename = 'inputOLGAtest.ppl'   #name of output file
 
 # Steps for generating data: 1) modify input file with new variables 2) run modified input file via bat file 3) extract results from ppl file and add to dataset
 
-size = 35            #size of dataset (TODO: Expand whenever you want) (got error message if above 350)
+size = 35            #size of dataset
 number_of_vars = 10  #number of variables to extract to the dataset. Change when you know this
 column_names = ["inlet pressure [Pa]", 
     "outlet pressure [Pa]", 
@@ -138,10 +139,42 @@ for i in range(size):
     #add values to dataset
     dataset[i] = arr
 
+if add_noise: #noise should be added for the MLE to work !!
+    # - determin maximum error for each entity (99.73 percent of all values is within this, meaning it is 3*std_dev)
+    maximum_noise = 0.05 #percent of maximum value
+    print(dataset)
+    max_p_error = maximum_noise * np.max(dataset[:,0]) # 5 percent of maximum of the measured inlet pressures
+    max_qo_error = maximum_noise * np.max(dataset[:,2]) # 5 percent of maximum of the measured inlet oil flow rate
+    max_qg_error = maximum_noise * np.max(dataset[:,5]) # 5 percent of maximum of the measured outlet gas flow rate
+    max_qw_error = maximum_noise * np.max(dataset[:,6]) # 5 percent of maximum of the measured inlet water flow rate
+    max_hu_error = maximum_noise * np.max(dataset[:,8]) # 5 percent of maximum of the measured inlet holdup
+    # - make error arrays and ensure 99.73 percent of all values is within this maximum error. Assume homoscedasticity
+    # inlet
+    noise_p_in = np.random.normal(0, max_p_error/3, size) 
+    noise_qo_in = np.random.normal(0,max_qo_error/3, size)
+    noise_qg_in = np.random.normal(0,max_qg_error/3, size)
+    noise_qw_in = np.random.normal(0,max_qw_error/3, size)
+    noise_hu_in = np.random.normal(0,max_hu_error/3, size)
+    # outlet
+    noise_p_out = np.random.normal(0, max_p_error/3, size) 
+    noise_qo_out = np.random.normal(0,max_qo_error/3, size)
+    noise_qg_out = np.random.normal(0,max_qg_error/3, size)
+    noise_qw_out = np.random.normal(0,max_qw_error/3, size)
+    noise_hu_out = np.random.normal(0,max_hu_error/3, size)
+    # - add the noise/error to the dataset array
+    dataset[:,0] += noise_p_in
+    dataset[:,1] += noise_p_out
+    dataset[:,2] += noise_qo_in
+    dataset[:,3] += noise_qo_out
+    dataset[:,4] += noise_qg_in
+    dataset[:,5] += noise_qg_out
+    dataset[:,6] += noise_qw_in
+    dataset[:,7] += noise_qw_out
+    dataset[:,8] += noise_hu_in
+    dataset[:,9] += noise_hu_out
 
 # create dataframe from numpy array with dataset
-df = pd.DataFrame(data = dataset,
-columns = column_names)
+df = pd.DataFrame(data = dataset, columns = column_names)
 
 # Generate a csv file from the dataframe and save to data-folder
 df.to_csv("data/dataset.csv", index=False)

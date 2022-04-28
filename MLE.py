@@ -14,42 +14,19 @@ from Pipe import Pipe
 plot_void_fractions = True
 
 #TODO: handle dataset: split, etc.. (not sure that initially should be done here or somewhere else, like in main or datprocessing)
-"""
-df = pd.read_csv ('data/dataset1.csv', usecols= ['outlet oil flowrate [Sm3/s]','outlet holdup [-]'])
 
-print(df.shape)
-print(type(df))
-#selct only valid simulations (here the first 349)
-df = df.head(349)
-print(df.shape)
+#TODO: make class that can be imported in main-py
 
-#add void fraction as 1 - holdup
-holdups = df.loc[:,"outlet holdup [-]"]
-holdups = holdups.to_numpy()
-void_fractions = 1- holdups[:]
-
-#print(type(void_fractions))
-#print(void_fractions.shape)
-
-exit()
-
-sns.regplot(x='outlet oil flowrate [Sm3/s]', y='outlet holdup [-]', data = df)
-plt.savefig('results/flowrate_holdup.png')
-
-array = df.to_numpy()
-print(type(array))
-#print(df[1][:])
-"""
 
 # -- Make dataset containing both values at inlet and outlet--
 
-# Make dataframes for values at inlet and outlet 
-df_out = pd.read_csv ('data/dataset0.csv', usecols= ["outlet pressure [Pa]", 
+# Make dataframes for values at inlet and outlet (have curently used dataset0 which is without error)
+df_out = pd.read_csv ('data/dataset_noisy.csv', usecols= ["outlet pressure [Pa]", 
     "outlet oil flowrate [m3/s]",
     "outlet gas flowrate [m3/s]",
     "outlet water flowrate [m3/s]",
     "outlet holdup [-]"])
-df_in = pd.read_csv ('data/dataset0.csv', usecols= ["inlet pressure [Pa]", 
+df_in = pd.read_csv ('data/dataset_noisy.csv', usecols= ["inlet pressure [Pa]", 
     "inlet oil flowrate [m3/s]", 
     "inlet gas flowrate [m3/s]", 
     "inlet water flowrate [m3/s]", 
@@ -71,11 +48,13 @@ df_in.columns = ["pressure [Pa]",
 df = pd.concat([df_in, df_out])
 #print(df.head)
 
+
 # Add void fraction as 1 - holdup
 holdups = df.loc[:,"holdup [-]"]
 holdups = holdups.to_numpy()
 void_fractions = 1- holdups[:]
 #TODO: add to df?
+
 
 # -- Make a prediction of the void fraction based on the parameters (P, q_i, j_i, ..?) --
 # Retrieve pressures and flow rates
@@ -103,9 +82,9 @@ def flowrate2superficialvel(flowrates, D = 0.2):
 
 def Hughmark_arr(oil_flowrates, water_flowrates, gas_flowrates):
     #TODO: state what this function is and does
-    #return: prediction for the void fraction
+    #return: array or float, prediction(s) for the void fraction based on the Hughmark correalation
 
-    #turn flow rates into superficial velocities
+    #turn flow rates into superficial velocities (not needed?)
     j_o = flowrate2superficialvel(oil_flowrates)
     j_w = flowrate2superficialvel(water_flowrates)
     j_g = flowrate2superficialvel(gas_flowrates)
@@ -119,9 +98,9 @@ def Hughmark_arr(oil_flowrates, water_flowrates, gas_flowrates):
 
 Hughmark_void_fractions = Hughmark_arr(oil_flowrates, water_flowrates, gas_flowrates)
 
-#add residual to Hughmark_array
-e = np.random.normal(0,0.02, 70)
-Hughmark_void_fractions+= e
+#add residual to Hughmark_array NOTE: this needs to be done atm to be able to use the optimization algorithm
+#e = np.random.normal(0,0.02, 70)
+#Hughmark_void_fractions+= e
 
 #TODO: add pred_void_fractions to dataframe (or make new with only void_fractions and pred_void_fractions?)
 
@@ -139,21 +118,58 @@ if plot_void_fractions:
 
 #Sceleton for MLE-function
 def MLE(parameters):
-    #extract parameters
+    # Extract parameters
     const, beta, std_dev = parameters 
-    #predict the output
+    # Predict the output
     pred = const + beta*Hughmark_void_fractions #make a prediction of the void_fraction based on 
-    #calculate the log-likelihood for given distribution (most likely multivariate normal distribution)
+    # Calculate the log-likelihood for given distribution (most likely multivariate normal distribution)
     LL = np.sum(stats.norm.logpdf(void_fractions, pred, std_dev))
-    #negative log-likelihood (to minimize)
+    # Negative log-likelihood (to minimize)
     neg_LL = -1*LL
     return neg_LL
 
 # Initialize a guess of the parameters: (const, beta, std_dev)
-arr= np.array([0.05, 1.0, 0.02]) #sensitive to first guess
+arr = np.array([0.05, 1.0, 0.02]) #NOTE: extremely sensitive to first guess
 
 # Minimize the negative log-likelihood
-mlemodel = minimize(MLE, arr, method='L-BFGS-B')
+mlemodel = minimize(MLE, arr, method='L-BFGS-B') #try different methods
 
+#method for giving outputs from pressure and flowrates
+def make_MLE_prediction(oil_flowrate, water_flowrate, gas_flowrate, mlemodel):
+    #obtain list of parameters [const, beta, std_dev]
+    const, beta, std_dev = mlemodel.x 
+    hughmark_pred = Hughmark_arr(oil_flowrate, water_flowrate, gas_flowrate)
+    prediction = const + hughmark_pred*beta
+    return prediction
+
+
+#check results
 print("MLE converged: ", mlemodel.success)
 print("parameters are: ", mlemodel.x)
+
+
+#test on generated testset
+int_to_test = 1
+df_test_out = pd.read_csv ('data/testset.csv', usecols= ["outlet pressure [Pa]", 
+    "outlet oil flowrate [m3/s]",
+    "outlet gas flowrate [m3/s]",
+    "outlet water flowrate [m3/s]",
+    "outlet holdup [-]"])
+
+oil_flowrates_test = df_test_out.loc[:,"outlet oil flowrate [m3/s]"]
+water_flowrates_test = df_test_out.loc[:,"outlet water flowrate [m3/s]"]
+gas_flowrates_test = df_test_out.loc[:,"outlet gas flowrate [m3/s]"]
+
+# Add void fraction as 1 - holdup
+holdups_test = df_test_out.loc[:,"outlet holdup [-]"]
+holdups_test = holdups_test.to_numpy()
+void_fractions_test = 1- holdups_test[:]
+
+
+#estimate flowrate
+estimate = make_MLE_prediction(oil_flowrates_test[int_to_test], water_flowrates_test[int_to_test], gas_flowrates_test[int_to_test], mlemodel)
+
+print("hughmark:", Hughmark_arr(oil_flowrates_test[int_to_test], water_flowrates_test[int_to_test], gas_flowrates_test[int_to_test]))
+print("predicted voidfrac:", estimate)
+print("real voidfrac:",void_fractions_test[int_to_test])
+
