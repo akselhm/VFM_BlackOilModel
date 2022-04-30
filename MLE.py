@@ -3,7 +3,7 @@
 
 import numpy as np
 import pandas as pd
-import csv
+import csv      #not needed
 from matplotlib import pyplot as plt
 import seaborn as sns   #not yet sure if needed. Maybe to plot
 from scipy import stats
@@ -11,16 +11,14 @@ from scipy.optimize import minimize
 
 from Pipe import Pipe
 
-plot_void_fractions = True
-
 #TODO: handle dataset: split, etc.. (not sure that initially should be done here or somewhere else, like in main or datprocessing)
 
 #TODO: make class that can be imported in main-py
 
-
+"""
 # -- Make dataset containing both values at inlet and outlet--
 
-# Make dataframes for values at inlet and outlet (have curently used dataset0 which is without error)
+# Make dataframes for values at inlet and outlet (have curently used dataset0 and dataset_noisy)
 df_out = pd.read_csv ('data/dataset_noisy.csv', usecols= ["outlet pressure [Pa]", 
     "outlet oil flowrate [m3/s]",
     "outlet gas flowrate [m3/s]",
@@ -68,88 +66,121 @@ pressures = pressures.to_numpy()
 oil_flowrates = oil_flowrates.to_numpy()
 water_flowrates = water_flowrates.to_numpy()
 gas_flowrates = gas_flowrates.to_numpy()
+"""
+# ------ Class for establishing relationship between the estimated and the "real" void fraction
 
-# Use some correlation (or try several) to make a new column in the dataset named "void fraction (Corrrelation)" or something like that
+class linear_relationship:
+    # class for establishing a linear relationship by using some correlation
+    def __init__(self) -> None:
+        pass
 
-def flowrate2superficialvel(flowrates, D = 0.2):
-    # Function for turning flow rates into superficial velocities for a single phase
-    #inputs:
-    #   flowrates = numpy array with flowrates
-    #   D = diameter of pipe (find some way of implementing without having to initialize a new pipe)
-    #returns:
-    #   array of superficail velocities
-    return 4*flowrates/(np.pi*D**2)
+    # Use some correlation (or try several) to make a new column in the dataset named "void fraction (Corrrelation)" or something like that
+    def flowrate2superficialvel(self, flowrates, D = 0.2):
+        # Function for turning flow rates into superficial velocities for a single phase
+        #inputs:
+        #   flowrates = numpy array with flowrates
+        #   D = diameter of pipe (find some way of implementing without having to initialize a new pipe)
+        #returns:
+        #   array of superficail velocities
+        return 4*flowrates/(np.pi*D**2)
 
-def Hughmark_arr(oil_flowrates, water_flowrates, gas_flowrates):
-    #TODO: state what this function is and does
-    #return: array or float, prediction(s) for the void fraction based on the Hughmark correalation
+    def Hughmark_arr(self, oil_flowrates, water_flowrates, gas_flowrates):
+        #TODO: state what this function is and does
+        #return: array or float, prediction(s) for the void fraction based on the Hughmark correalation
 
-    #turn flow rates into superficial velocities (not needed?)
-    j_o = flowrate2superficialvel(oil_flowrates)
-    j_w = flowrate2superficialvel(water_flowrates)
-    j_g = flowrate2superficialvel(gas_flowrates)
+        #turn flow rates into superficial velocities (not needed?)
+        j_o = self.flowrate2superficialvel(oil_flowrates)
+        j_w = self.flowrate2superficialvel(water_flowrates)
+        j_g = self.flowrate2superficialvel(gas_flowrates)
 
-    #define last superficial velocities
-    j_l = j_o + j_w
-    j   = j_l + j_g
+        #define last superficial velocities
+        j_l = j_o + j_w
+        j   = j_l + j_g
 
-    pred_void_fractions = j_g/(1.2*j)
-    return pred_void_fractions
+        pred_void_fractions = j_g/(1.2*j)
+        return pred_void_fractions
 
-Hughmark_void_fractions = Hughmark_arr(oil_flowrates, water_flowrates, gas_flowrates)
 
-#add residual to Hughmark_array NOTE: this needs to be done atm to be able to use the optimization algorithm
-#e = np.random.normal(0,0.02, 70)
-#Hughmark_void_fractions+= e
+    #TODO: add pred_void_fractions to dataframe (or make new with only void_fractions and pred_void_fractions?)
 
-#TODO: add pred_void_fractions to dataframe (or make new with only void_fractions and pred_void_fractions?)
+    #Examine the relationship between the predicted value of the void fraction from data Y compared to the actual void fraction given from data Y
+    def plot_void_fractions(self, Hughmark_void_fractions, void_fractions): #void_fractions as input as well??
+        #function for making a scatter plot visualising the relationship between the estimated void fraction from a correlation and the void fraction obtained from simulations in OLGA
+        fig = plt.figure()
+        plt.scatter(Hughmark_void_fractions, void_fractions, c ="blue", marker="x")
+        plt.title("Measured vs predicted void fractions based on flow rates and pressure")
+        plt.ylabel('Actual void fractions (from OLGA)')
+        plt.xlabel('Predicted void fractions using the Hughmark correlation')
+        fig.savefig('results/HugmarkVSvoidfracs.png')
 
-#Examine the relationship between the predicted value of the void fraction from data Y compared to the actual void fraction given from data Y
 
-if plot_void_fractions:
-    fig = plt.figure()
-    plt.scatter(Hughmark_void_fractions, void_fractions, c ="blue", marker="x")
-    plt.title("Measured vs predicted void fractions based on flow rates and pressure")
-    plt.ylabel('Actual void fractions (from OLGA)')
-    plt.xlabel('Predicted void fractions using the Hughmark correlation')
-    fig.savefig('results/HugmarkVSvoidfracs.png')
 
-#TODO: define an MLE function containing: (I) the model building equation and (II) the logarithmic value of the probability density function
+# ----------- Class of MLE predictor -------------
 
-#Sceleton for MLE-function
-def MLE(parameters):
-    # Extract parameters
-    const, beta, std_dev = parameters 
-    # Predict the output
-    pred = const + beta*Hughmark_void_fractions #make a prediction of the void_fraction based on 
-    # Calculate the log-likelihood for given distribution (most likely multivariate normal distribution)
-    LL = np.sum(stats.norm.logpdf(void_fractions, pred, std_dev))
-    # Negative log-likelihood (to minimize)
-    neg_LL = -1*LL
-    return neg_LL
+class MLE_predictor:
+    #class for estimating the maximum likelihood of the void fraction
+    def __init__(self, relation, void_fractions, x_void_fractions):
+        self.relation = relation #object for calculation a relationship between correlated and estimated void fraction
+        self.void_fractions = void_fractions # "Real" void fractions estimated from OLGA
+        self.x_void_fractions = x_void_fractions #void fraction that is estimated from some corelation 
+
+
+    #MLE function to use in the optimization algorithm to "train" the estimator
+    def MLE(self, parameters): #x_array is the void fractions predicted from correlations
+        # Extract parameters
+        const, beta, std_dev = parameters 
+        # Predict the output
+        pred = const + beta*self.x_void_fractions #make a prediction of the void_fraction based on the void fractions predicted from some correlation
+        # Calculate the log-likelihood for given distribution (most likely multivariate normal distribution)
+        LL = np.sum(stats.norm.logpdf(self.void_fractions, pred, std_dev))
+        # Negative log-likelihood (to minimize)
+        neg_LL = -1*LL
+        return neg_LL
+
+    # Initialize a guess of the parameters: (const, beta, std_dev)
+    ### arr = np.array([0.05, 1.0, 0.02]) #NOTE: extremely sensitive to first guess     #PUT OUTSIDE CLASS
+
+    # Minimize the negative log-likelihood
+    def make_mlemodel(self, arr):
+        #input: numpyarray of intial guess: np.array(const, beta, std_dev)
+        mlemodel = minimize(self.MLE, arr, method='L-BFGS-B') #try different methods (NOTE: remember to import minimize in main.py as well)
+        return mlemodel
+
+    ### mlemodel = make_mlemodel(arr)       #PUT OUTSIDE CLASS
+
+    #Function for giving outputs from pressure and flowrates
+    def make_MLE_prediction(self, oil_flowrate, water_flowrate, gas_flowrate, mlemodel):
+        #obtain list of parameters [const, beta, std_dev]
+        const, beta, std_dev = mlemodel.x 
+        hughmark_pred = self.relation.Hughmark_arr(oil_flowrate, water_flowrate, gas_flowrate)
+        prediction = const + hughmark_pred*beta
+        return prediction
+
+
+# ---------- TEST ------------------------
+"""
+# Make object of the MLE_predictor class 
+
+relation = linear_relationship()
+
+Hughmark_void_fractions = relation.Hughmark_arr(oil_flowrates, water_flowrates, gas_flowrates)
+
+predictor = MLE_predictor(relation, void_fraction, Hughmark_void_fractions)
+
 
 # Initialize a guess of the parameters: (const, beta, std_dev)
-arr = np.array([0.05, 1.0, 0.02]) #NOTE: extremely sensitive to first guess
+arr = np.array([0.05, 1.0, 0.02]) #NOTE: extremely sensitive to first guess 
 
-# Minimize the negative log-likelihood
-mlemodel = minimize(MLE, arr, method='L-BFGS-B') #try different methods
+# make optimizer object
+mlemodel = predictor.make_mlemodel(arr)    
 
-#method for giving outputs from pressure and flowrates
-def make_MLE_prediction(oil_flowrate, water_flowrate, gas_flowrate, mlemodel):
-    #obtain list of parameters [const, beta, std_dev]
-    const, beta, std_dev = mlemodel.x 
-    hughmark_pred = Hughmark_arr(oil_flowrate, water_flowrate, gas_flowrate)
-    prediction = const + hughmark_pred*beta
-    return prediction
-
-
-#check results
+# -- check results for the optimization --
 print("MLE converged: ", mlemodel.success)
 print("parameters are: ", mlemodel.x)
 
 
-#test on generated testset
-int_to_test = 1
+# -- test on generated testset -- 
+int_to_test = 2
 df_test_out = pd.read_csv ('data/testset.csv', usecols= ["outlet pressure [Pa]", 
     "outlet oil flowrate [m3/s]",
     "outlet gas flowrate [m3/s]",
@@ -167,9 +198,11 @@ void_fractions_test = 1- holdups_test[:]
 
 
 #estimate flowrate
-estimate = make_MLE_prediction(oil_flowrates_test[int_to_test], water_flowrates_test[int_to_test], gas_flowrates_test[int_to_test], mlemodel)
+estimate = predictor.make_MLE_prediction(oil_flowrates_test[int_to_test], water_flowrates_test[int_to_test], gas_flowrates_test[int_to_test], mlemodel)
 
-print("hughmark:", Hughmark_arr(oil_flowrates_test[int_to_test], water_flowrates_test[int_to_test], gas_flowrates_test[int_to_test]))
+print("hughmark:", relation.Hughmark_arr(oil_flowrates_test[int_to_test], water_flowrates_test[int_to_test], gas_flowrates_test[int_to_test]))
 print("predicted voidfrac:", estimate)
 print("real voidfrac:",void_fractions_test[int_to_test])
+"""
+
 

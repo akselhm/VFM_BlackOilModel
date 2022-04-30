@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from blackoil import black_oil
+from MLE import MLE_predictor
 from Pipe import Pipe
 
 
@@ -8,9 +9,11 @@ class TH_model:
     #thermal-hydrailic model based on the drift-flux method
     #input objects: fluid from Black Oil Model, pipe with simple geometry
     #input parameters: q_l_in (inlet liquid flowrate at SC), p_out (pressure at the outlet) 
-    def __init__(self, fluid, pipe, q_l_in, p_out):
+    def __init__(self, fluid, MLE_predictor, mlemodel, pipe, q_l_in, p_out):
         #TODO: make sure all inputs are valid
         self.fluid = fluid      #object of the blackoil class containing functions to handel fluid properties
+        self.MLE_predictor = MLE_predictor # object for estimation the maximum likelihood for the void fraction
+        self.mlemodel = mlemodel
         self.pipe = pipe        #object of the pipe class containing information about the pipe
 
         self.q_l_in0 = q_l_in   #assume q_l_in is given at standard conditions (else divide by B_l which is dependent on P[0])
@@ -146,11 +149,18 @@ class TH_model:
         j   = j_l + j_g
         
         # void and liquid fractions
-        if void_frac_method =="Bendiksen":
+        if void_frac_method == "MLE": #maximum likelihood estimation to estimate the void fraction
+            #calculate flowrates (not sure if needed)
+            oil_flowrate    = j_o*np.pi*self.pipe.D**2 / 4
+            water_flowrate  = j_w*np.pi*self.pipe.D**2 / 4
+            gas_flowrate    = j_g*np.pi*self.pipe.D**2 / 4
+            void_frac = self.MLE_predictor.make_MLE_prediction(oil_flowrate, water_flowrate, gas_flowrate, self.mlemodel)
+        elif void_frac_method =="Bendiksen":
             Cd, Ud = self.Bendiksen(j)
+            void_frac = self.void_frac_func(j, j_g, Cd, Ud)
         else: #woldesmayat and Gayar (currently bug for large N caused by P>P_pb.. =>.. R_so=GOR.. =>.. j_g=0)
             Cd, Ud = self.woldesemayat_ghajar(P_i, j, j_g, j_l, rho_g, rho_l, R_so) #woldesmayat and Gayar
-        void_frac = self.void_frac_func(j, j_g, Cd, Ud) #*
+            void_frac = self.void_frac_func(j, j_g, Cd, Ud)
         w_frac = self.liquid_k_frac(j_w, j_o, void_frac)
         o_frac = self.liquid_k_frac(j_o, j_w, void_frac)
         

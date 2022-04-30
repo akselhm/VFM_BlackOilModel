@@ -1,8 +1,15 @@
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from blackoil import black_oil
 from Pipe import Pipe
 from VFM import TH_model
+from MLE import linear_relationship, MLE_predictor
+
+#OPTIONS
+
+run_mechanistic_model = True
+run_datadriven_model = True
 
 # -- initialize values --
 
@@ -21,7 +28,7 @@ T_r = 25 + 273.15    # [K] included in black oil as it is constant
 D = 0.2     # [m]
 eps = 3e-5#0.00021#3e-5 # [m]
 length = 1000   # [m]
-N = 10000 
+N = 500 
 
 # thermal-hydraulic model
 q_l_in = 0.157726   # [sm^3/s] 
@@ -29,16 +36,98 @@ p_out = 10e5    # [Pa]
 #void_frac_method = "Bendiksen" 
 twophase_ff_method = "VG"
 
+#TODO: initialize maximum likelihood object: make and train object that should be used in model
+
+# ------------ MLE object -----------------
+
+# -- handle dataset for MLE --
+
+df_out = pd.read_csv ('data/dataset_noisy.csv', usecols= ["outlet pressure [Pa]", 
+    "outlet oil flowrate [m3/s]",
+    "outlet gas flowrate [m3/s]",
+    "outlet water flowrate [m3/s]",
+    "outlet holdup [-]"])
+df_in = pd.read_csv ('data/dataset_noisy.csv', usecols= ["inlet pressure [Pa]", 
+    "inlet oil flowrate [m3/s]", 
+    "inlet gas flowrate [m3/s]", 
+    "inlet water flowrate [m3/s]", 
+    "inlet holdup [-]"])
+
+# Rename columns
+df_out.columns = ["pressure [Pa]", 
+    "oil flowrate [m3/s]", 
+    "gas flowrate [m3/s]", 
+    "water flowrate [m3/s]", 
+    "holdup [-]"]
+df_in.columns = ["pressure [Pa]", 
+    "oil flowrate [m3/s]", 
+    "gas flowrate [m3/s]", 
+    "water flowrate [m3/s]", 
+    "holdup [-]"]
+
+# Concatenate dataframes 
+df = pd.concat([df_in, df_out])
+#print(df.head)
+
+# Obtain void fraction as 1 - holdup
+holdups = df.loc[:,"holdup [-]"]
+holdups = holdups.to_numpy()
+void_fractions = 1- holdups[:]
+
+# Retrieve pressures and flow rates
+pressures = df.loc[:,"pressure [Pa]"]
+oil_flowrates = df.loc[:,"oil flowrate [m3/s]"]
+water_flowrates = df.loc[:,"water flowrate [m3/s]"]
+gas_flowrates = df.loc[:,"gas flowrate [m3/s]"]
+
+# Turn to numpy array
+pressures = pressures.to_numpy()
+oil_flowrates = oil_flowrates.to_numpy()
+water_flowrates = water_flowrates.to_numpy()
+gas_flowrates = gas_flowrates.to_numpy()
+
+
+# -- Make object of the MLE_predictor class --
+
+relation = linear_relationship()
+
+Hughmark_void_fractions = relation.Hughmark_arr(oil_flowrates, water_flowrates, gas_flowrates)
+
+predictor = MLE_predictor(relation, void_fractions, Hughmark_void_fractions)
+
+
+# Initialize a guess of the parameters: (const, beta, std_dev)
+arr = np.array([0.05, 1.0, 0.025]) #NOTE: extremely sensitive to first guess 
+
+# make optimizer object
+mlemodel = predictor.make_mlemodel(arr)    
+
+# -- check results for the optimization --
+print("MLE converged: ", mlemodel.success)
+print("parameters are: ", mlemodel.x)
+
+
+
+# --------------------------------------------
 
 # -- initialize objects: fluid, pipe, TH_model --
 fluid = black_oil(GOR, wc, p_bp, t_bp, rho_o0, rho_g0, rho_w0, gamma_g0, T_r)
 pipe = Pipe(D, eps, length, N)
-model = TH_model(fluid, pipe, q_l_in, p_out)
+model = TH_model(fluid, predictor, mlemodel, pipe, q_l_in, p_out)
 
-# run algorithm
+
+
+# run algorithm for mechanistic approach
 B_pressures = model.Andreolli_algorithhm("Bendiksen", twophase_ff_method) 
 
 WG_pressures = model.Andreolli_algorithhm("WG", twophase_ff_method)
+
+MLE_pressures = model.Andreolli_algorithhm("MLE", twophase_ff_method)
+
+
+
+# -- all below is not relevant in master thesis --
+
 
 # iterate through the pressures and find flow rates, wc, gor, wor etc. 
 def computePipe(pressures, void_frac_method):
@@ -127,7 +216,8 @@ WGWOR_list, WGwc_list, WGw_frac_list, WGvoid_frac_list, WGoil_frac_list, WGq_l_l
 # print values at input and output for comparison
 print("pressure at input with Bendiksen is :", B_pressures[0])
 print("pressure at input with Woldesmayat and Gajar is :", WG_pressures[0])
-
+print("pressure at input with MLE is :", MLE_pressures[0])
+"""
 print(" the pressure difference with Bendiksen is: ", (B_pressures[0]- B_pressures[-1])/100000, "bar")
 print(" the pressure difference with W&G is: ", (WG_pressures[0]- WG_pressures[-1])/100000, "bar")
 
@@ -139,7 +229,7 @@ print("local water flowrate at input and output is :", Bq_w_list[0], "and", Bq_w
 
 print("void fraction estimated at input and output with Bendiksen is :", Bvoid_frac_list[0], "and", Bvoid_frac_list[-1])
 print("void fraction estimated at input and output with Woldesmayat and Gajar is :", WGvoid_frac_list[0], "and", WGvoid_frac_list[-1])
-
+"""
 # ------- plotting ----------
 x_list = pipe.x
 
@@ -148,6 +238,7 @@ fig = plt.figure()
 plt.title('Pressure through pipe')
 plt.plot(x_list, B_pressures, 'b--', label='Bendiksen')
 plt.plot(x_list, WG_pressures, 'r-.', label='Woldesmayat and Ghajar')
+plt.plot(x_list, MLE_pressures, 'g-.', label='MLE')
 plt.ylabel('Pressure [Pa]')
 plt.xlabel('Position [m]')
 plt.legend()
