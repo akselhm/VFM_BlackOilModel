@@ -2,9 +2,9 @@
 #uses an inp-file to create an OLGA-model and a bat-file to run the case. Retrieves the data from the generated ppl-file. The inp-file is modified between each run in a loop.
 
 #OPTIONS
-change_pressure=True #deside if input pressure should be changed
+change_pressure=False #deside if input pressure should be changed
 skewed_ql_in = False #decide if data set should be evenly distibuted w.r.t inlet liquid (oil) flowrate or not. Example of skewed dataset: 10% - [0.05 - 0.15] m3/s and 90% - [0.15 - 0.25] m3/s
-add_noise = True
+add_noise = False
 
 #TODO: select what parameters is wanted from the ppl-file and expand size of dataset
 #TODO: add noise to dataset (!!!)
@@ -26,7 +26,7 @@ pplfilename = 'inputOLGAtest.ppl'   #name of output file
 
 # Steps for generating data: 1) modify input file with new variables 2) run modified input file via bat file 3) extract results from ppl file and add to dataset
 
-size = 35            #size of dataset
+size = 20            #size of dataset
 number_of_vars = 10  #number of variables to extract to the dataset. Change when you know this
 column_names = ["inlet pressure [Pa]", 
     "outlet pressure [Pa]", 
@@ -104,15 +104,15 @@ for i in range(size):
     # pressure
     ppl.extract(15) #extract the pressures to the ppl object
     pressures = ppl.data[15][1] # save the pressures to array
-    p_in = pressures[-1][1] #last timestep, "first" value (disregard value at pos. 0)
-    if change_pressure == False:
-        p_out = pressures[-1][-1] # or give the specified value directly if known in advanced (as it is not supposed to change) (NOTE: outlet in ppl is currently not giving the same value as specified in the inp-file)
+    p_in = pressures[-1][0] #last timestep
+    #if change_pressure == False: #<-remove this? 
+    p_out = pressures[-1][-1] # or give the specified value directly if known in advanced (as it is not supposed to change) (NOTE: outlet in ppl is not giving the same value as specified in the inp-file)
 
-    # Flow rates (extract at local conditions, not standard) #NOTE:!!!!
+    # Flow rates (extract at local conditions, not standard)
     # gas voulme flow
     ppl.extract(3)
     gas_flow = ppl.data[3][1] # save the pressures to array
-    qg_in = gas_flow[-1][1] #last timestep, first value 
+    qg_in = gas_flow[-1][1] #last timestep, "first" value (disregard value at pos. 0 for flow rates)
     qg_out = gas_flow[-1][-1] #last timestep, last value 
 
     # Volumetric flow rate oil
@@ -130,7 +130,7 @@ for i in range(size):
     # Holdup (use to derive void fraction for MLE)
     ppl.extract(13)
     holdup = ppl.data[13][1]    # save the holdup to array
-    hol_in = holdup[-1][1]      # last timestep, first value
+    hol_in = holdup[-1][0]      # last timestep, first value
     hol_out = holdup[-1][-1]    # last timestep, last value
 
     #make array of values
@@ -142,7 +142,7 @@ for i in range(size):
 if add_noise: #noise should be added for the MLE to work !!
     # - determin maximum error for each entity (99.73 percent of all values is within this, meaning it is 3*std_dev)
     maximum_noise = 0.05 #percent of maximum value
-    print(dataset)
+    #print(dataset)
     max_p_error = maximum_noise * np.max(dataset[:,0]) # 5 percent of maximum of the measured inlet pressures
     max_qo_error = maximum_noise * np.max(dataset[:,2]) # 5 percent of maximum of the measured inlet oil flow rate
     max_qg_error = maximum_noise * np.max(dataset[:,5]) # 5 percent of maximum of the measured outlet gas flow rate
@@ -166,7 +166,7 @@ if add_noise: #noise should be added for the MLE to work !!
     dataset[:,1] += noise_p_out
     dataset[:,2] += noise_qo_in
     dataset[:,3] += noise_qo_out
-    dataset[:,4] += noise_qg_in
+    dataset[:,4] += noise_qg_in 
     dataset[:,5] += noise_qg_out
     dataset[:,6] += noise_qw_in
     dataset[:,7] += noise_qw_out

@@ -193,8 +193,9 @@ class TH_model:
     #--------------------------------------------------------------------------              
 
     # Algorithm for solving the problem
-    def Andreolli_algorithhm(self, void_frac_method = "Bendiksen", twophase_ff_method="VG"):
-        print("algorithm started with void fraction method", void_frac_method, "and two phase friction factor", twophase_ff_method)
+    def Andreolli_algorithhm(self, void_frac_method = "Bendiksen", twophase_ff_method="VG", print_iteration=False):
+        if print_iteration:
+            print("algorithm started with void fraction method", void_frac_method, "and two phase friction factor", twophase_ff_method)
         # uses backward differenses and an iterative approach to estimate the new pressure for each backward step based on averages. 
         # Uses P_pred to estimate correlations at new step P_{i-1} and the averages of other properties 
         # --------------------------------------------------------
@@ -243,7 +244,8 @@ class TH_model:
             rho_m_i = rho_m
             F_term_i = F_term
             P_i = P
-            if i%(self.N//10)==0:
+            if i%(self.N//10)==0 and print_iteration:
                 print("iteration at:", i)
-        print("iteration ended")
+        if print_iteration:
+            print("iteration ended")
         return P_list
