@@ -11,9 +11,6 @@ from scipy.optimize import minimize
 
 from Pipe import Pipe
 
-#TODO: handle dataset: split, etc.. (not sure that initially should be done here or somewhere else, like in main or datprocessing)
-
-#TODO: make class that can be imported in main-py
 
 """
 # -- Make dataset containing both values at inlet and outlet--
@@ -51,8 +48,6 @@ df = pd.concat([df_in, df_out])
 holdups = df.loc[:,"holdup [-]"]
 holdups = holdups.to_numpy()
 void_fractions = 1- holdups[:]
-#TODO: add to df?
-
 
 # -- Make a prediction of the void fraction based on the parameters (P, q_i, j_i, ..?) --
 # Retrieve pressures and flow rates
@@ -130,7 +125,7 @@ class MLE_predictor:
         # Extract parameters
         const, beta, std_dev = parameters 
         # Predict the output
-        pred = const + beta*self.x_void_fractions #make a prediction of the void_fraction based on the void fractions predicted from some correlation
+        pred = const + beta*self.x_void_fractions #make a prediction of the acttual void_fraction based on the estimated void fractions from some correlation
         # Calculate the log-likelihood for given distribution (most likely multivariate normal distribution)
         LL = np.sum(stats.norm.logpdf(self.void_fractions, pred, std_dev))
         # Negative log-likelihood (to minimize)
@@ -152,7 +147,9 @@ class MLE_predictor:
     def make_MLE_prediction(self, oil_flowrate, water_flowrate, gas_flowrate, mlemodel):
         #obtain list of parameters [const, beta, std_dev]
         const, beta, std_dev = mlemodel.x 
+        #make an initial prediction using the hughmark correlation
         hughmark_pred = self.relation.Hughmark_arr(oil_flowrate, water_flowrate, gas_flowrate)
+        #make the final prediction for 
         prediction = const + hughmark_pred*beta
         return prediction
 

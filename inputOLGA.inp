@@ -1,0 +1,80 @@
+
+!**************************************************************************************
+! Generated with OLGA version 2019.1.0
+!**************************************************************************************
+
+!**************************************************************************************
+! Global keywords
+!**************************************************************************************
+OPTIONS TEMPERATURE=OFF, STEADYSTATE=NOTEMP, COMPOSITIONAL=BLACKOIL, DEBUG=OFF, \
+        FLOWMODEL=OLGAHD
+INTEGRATION ENDTIME=1.5 H, MAXDT=1 s, MINDT=0.1 s, STARTTIME=0 s, DTSTART=0.1 s
+RESTART READFILE=OFF
+TREND DTPLOT=5 m
+TRENDDATA VARIABLE=(VOLGBL, HT)
+TRENDDATA VARIABLE=(LIQC, WATC, OILC)
+PROFILE DTPLOT=60 m
+BLACKOILCOMPONENT LABEL=Gas, TYPE=GAS, GASSPECIFICGRAVITY=0.814
+BLACKOILCOMPONENT LABEL=Oil, TYPE=OIL, OILSPECIFICGRAVITY=0.85	! old value: 0.867
+BLACKOILFEED LABEL=Bofluid, OILCOMPONENT=Oil, GASCOMPONENT=Gas, WATERCOMPONENT=Water, \
+        WATERCUT=0.3 -, GOR=50 Sm3/Sm3
+BLACKOILCOMPONENT LABEL=Water, TYPE=WATER, WATERSPECIFICGRAVITY=1.00
+
+!**************************************************************************************
+! Library keywords
+!**************************************************************************************
+MATERIAL LABEL="Carbon Steel", CAPACITY=470 J/kg-C, CONDUCTIVITY=45 W/m-C, DENSITY=7850 kg/m3
+WALL LABEL="O4P-0_WALL_0", THICKNESS=(0.00317916666666666, 0.00317916666666666, \
+        0.00317916666666666) m, MATERIAL=("Carbon Steel", "Carbon Steel", "Carbon Steel")
+
+!**************************************************************************************
+! Network Component
+!**************************************************************************************
+NETWORKCOMPONENT TYPE=FLOWPATH, TAG=FLOWPATH_1
+ PARAMETERS LABEL="O4P-0_Flowpath"
+ BRANCH FLUID=Bofluid
+ GEOMETRY LABEL="GEOMETRY-1", XSTART=0 m, YSTART=0 m
+ PIPE ROUGHNESS=3E-05 m, LABEL="Pipe-1", WALL="O4P-0_WALL_0", NSEGMENT=5, LENGTH=200 m, \
+        ELEVATION=0 m, DIAMETER=0.2 m
+ PIPE ROUGHNESS=3E-05 m, LABEL="Pipe-2", WALL="O4P-0_WALL_0", NSEGMENT=3, LENGTH=200 m, \
+        ELEVATION=0 m, DIAMETER=0.2 m
+ PIPE ROUGHNESS=3E-05 m, LABEL="Pipe-3", WALL="O4P-0_WALL_0", NSEGMENT=2, LENGTH=200 m, \
+        ELEVATION=0 m, DIAMETER=0.2 m
+ PIPE ROUGHNESS=3E-05 m, LABEL="Pipe-4", WALL="O4P-0_WALL_0", NSEGMENT=2, LENGTH=200 m, \
+        ELEVATION=0 m, DIAMETER=0.2 m
+ PIPE ROUGHNESS=3E-05 m, LABEL="Pipe-5", WALL="O4P-0_WALL_0", NSEGMENT=2, LENGTH=200 m, \
+        ELEVATION=0 m, DIAMETER=0.2 m
+ SOURCE LABEL="SOUR-1", TIME=0 s, PIPE="Pipe-1", SECTION=1, TEMPERATURE=25 C, \ 
+        FEEDNAME=Bofluid, PHASE=OIL, FEEDSTDFLOW=0.09497363671254912 Sm3/s 
+ INITIALCONDITIONS TEMPERATURE=25 C
+ PROFILEDATA VARIABLE=(GT, QG, QGST, QOST, QLTHL, QLTWT, QWST, QT, USG, USLTHL, USLTWT) 
+ PROFILEDATA VARIABLE=(HOL, HT, PT, WC, TM, ID) 
+ POSITION LABEL=Inlet, PIPE="Pipe-1", SECTIONBOUNDARY=2
+ POSITION LABEL=Outlet, PIPE="Pipe-5", SECTIONBOUNDARY=2
+ TRENDDATA VARIABLE=(PT, TM, HOL), POSITION=(Inlet, Outlet)
+ TRENDDATA VARIABLE=(GT, USG, USLTHL, USLTWT, QLTWT, QLTHL, QGST, QWST, \
+        QOST, QG), POSITION=(Inlet, Outlet)
+ENDNETWORKCOMPONENT
+
+!**************************************************************************************
+! Network Component
+!**************************************************************************************
+NETWORKCOMPONENT TYPE=NODE, TAG=NODE_1
+ PARAMETERS LABEL=NODE_1, TYPE=CLOSED
+ENDNETWORKCOMPONENT
+
+!**************************************************************************************
+! Network Component
+!**************************************************************************************
+NETWORKCOMPONENT TYPE=NODE, TAG=NODE_2
+ PARAMETERS LABEL=NODE_2, TYPE=PRESSURE, FEEDNAME=Bofluid, FEEDVOLFRACTION=1 -, \
+        TEMPERATURE=25 C, PRESSURE=1250000 Pa, FLUID=Bofluid 
+ENDNETWORKCOMPONENT
+
+!**************************************************************************************
+! Connections
+!**************************************************************************************
+CONNECTION TERMINALS = (FLOWPATH_1 INLET, NODE_1 FLOWTERM_1)
+CONNECTION TERMINALS = (FLOWPATH_1 OUTLET, NODE_2 FLOWTERM_1)
+
+ENDCASE

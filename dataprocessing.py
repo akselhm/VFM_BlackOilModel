@@ -20,8 +20,8 @@ pd.options.display.max_colwidth = 120 #needed(?) for the dataframes created from
 # - load files - 
 
 path = 'C:/Users/aksel/NTNU/Prosjektoppgave/VFM_BlackOilModel/' # .. do not really need anymore as all files are in same folder 
-inpfilename = 'inputOLGAtest.inp' # name of input file used to create OLGA-object
-pplfilename = 'inputOLGAtest.ppl'   #name of output file
+inpfilename = 'inputOLGA.inp' # name of input file used to create OLGA-object
+pplfilename = 'inputOLGA.ppl'   #name of output file
 
 
 # Steps for generating data: 1) modify input file with new variables 2) run modified input file via bat file 3) extract results from ppl file and add to dataset
@@ -96,7 +96,7 @@ for i in range(size):
     inputfile.close()
 
     # -- STEP TWO: run the modified input file from batch file --
-    subprocess.call([r'C:/Users/aksel/NTNU/Prosjektoppgave/VFM_BlackOilModel/testbatchfile.bat']) #run inputfile via batchfile
+    subprocess.call([r'C:/Users/aksel/NTNU/Prosjektoppgave/VFM_BlackOilModel/inputOLGA.bat']) #run inputfile via batchfile
 
     # -- STEP THREE: extract data and add to dataset (keep control of how many variables you have in each ) --
     ppl = fa.Ppl(path+pplfilename) #create ppl-object 

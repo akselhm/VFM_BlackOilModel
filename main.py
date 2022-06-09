@@ -6,6 +6,9 @@ from Pipe import Pipe
 from VFM import TH_model
 from MLE import linear_relationship, MLE_predictor
 
+#increse fonsize of plots
+plt.rcParams.update({'font.size': 15})
+
 #OPTIONS
 
 run_mechanistic_model = True
@@ -173,25 +176,25 @@ def test_model(df, pressure):
         #run model with Bendiksen
         B_pressures = model.Andreolli_algorithhm("Bendiksen", twophase_ff_method)
         B_inlet_pressures[i] = B_pressures[0] #add computed inlet pressure to result array
-        B_error[i] = (pressures_in[i] - B_inlet_pressures[i])*100/(pressures_in[i] - pressure)
+        B_error[i] = (pressures_in[i] - B_inlet_pressures[i])*100/pressures_in[i]# - pressure)
 
         #run model with Woldesmayat and Gajar
         WG_pressures = model.Andreolli_algorithhm("WG", twophase_ff_method)
         WG_inlet_pressures[i] = WG_pressures[0] #add computed inlet pressure to result array
-        WG_error[i] = (pressures_in[i] - WG_inlet_pressures[i])*100/(pressures_in[i] - pressure)
+        WG_error[i] = (pressures_in[i] - WG_inlet_pressures[i])*100/pressures_in[i]# - pressure)
 
         #run model with MLE for void fraction
         MLE_pressures = model.Andreolli_algorithhm("MLE", twophase_ff_method)
         MLE_inlet_pressures[i] = MLE_pressures[0] #add computed inlet pressure to result array
-        MLE_error[i] = (pressures_in[i] - MLE_inlet_pressures[i])*100/(pressures_in[i] - pressure)
+        MLE_error[i] = (pressures_in[i] - MLE_inlet_pressures[i])*100/pressures_in[i]# - pressure)
 
     #plot the inlet pressures
     fig = plt.figure()
-    plt.plot(ql_in_array, pressures_in, label="real (OLGA)")
-    plt.plot(ql_in_array, B_inlet_pressures, label="Bendiksen")
-    plt.plot(ql_in_array, WG_inlet_pressures, label="W & G")
-    plt.plot(ql_in_array, MLE_inlet_pressures, label="MLE")
-    plt.title("Constant outlet pressure of "+str(pressure) )
+    plt.plot(ql_in_array, pressures_in, 'k' , label="real (OLGA)")
+    plt.plot(ql_in_array, B_inlet_pressures, 'b--' ,label="Bendiksen")
+    plt.plot(ql_in_array, WG_inlet_pressures, 'r-.', label="W & G")
+    plt.plot(ql_in_array, MLE_inlet_pressures, 'g--', label="MLE")
+    #plt.title("Constant outlet pressure of "+str(pressure) )
     plt.xlabel('inlet liquid flow rate [m3/s]')
     plt.ylabel('inlet pressure [Pa]')
     plt.legend()
@@ -200,10 +203,10 @@ def test_model(df, pressure):
 
     #plot the error
     fig = plt.figure()
-    plt.plot(ql_in_array, B_error, label="Bendiksen")
-    plt.plot(ql_in_array, WG_error, label="W & G")
-    plt.plot(ql_in_array, MLE_error, label="MLE")
-    plt.title("Error: Outlet pressure = "+str(pressure)+" Pa" )
+    plt.plot(ql_in_array, B_error, 'b',label="Bendiksen")
+    plt.plot(ql_in_array, WG_error, 'r',label="W & G")
+    plt.plot(ql_in_array, MLE_error, 'g', label="MLE")
+    #plt.title("Error: Outlet pressure = "+str(pressure)+" Pa" )
     plt.xlabel('inlet liquid flow rate [m3/s]')
     plt.ylabel('Error [%]')
     plt.legend()
@@ -215,260 +218,4 @@ def test_model(df, pressure):
 test_model(dataset_p75, 750000)
 test_model(dataset_p125, 1250000)
 
-# -- all below is not relevant in master thesis --
-exit()
-
-# iterate through the pressures and find flow rates, wc, gor, wor etc. 
-def computePipe(pressures, void_frac_method):
-    WOR_list = np.zeros(len(pressures))
-    wc_list = np.zeros(len(pressures))
-
-
-    q_l_list = np.zeros(len(pressures))
-    q_w_list = np.zeros(len(pressures))
-    q_g_list = np.zeros(len(pressures))
-    q_o_list = np.zeros(len(pressures))
-
-    w_frac_list = np.zeros(len(pressures))
-    void_frac_list = np.zeros(len(pressures))
-    oil_frac_list = np.zeros(len(pressures))
-
-    # standard conditions
-
-    q_l0_list = np.zeros(len(pressures))
-    q_w0_list = np.zeros(len(pressures))
-    q_g0_list = np.zeros(len(pressures))
-    q_o0_list = np.zeros(len(pressures))
-
-    # iteration
-    for i in range(len(pressures)):
-        R_so = fluid.R_so_func(pressures[i])
-        B_o = fluid.B_o_func(pressures[i], R_so)
-        B_w = fluid.B_w_func(pressures[i])
-        Z_g = fluid.Z_g_func(pressures[i])
-        R_sl = fluid.R_so_func(R_so)
-        B_l = fluid.B_l_func(B_w, B_o)
-        
-        rho_w = fluid.rho_w_func(B_w)
-        rho_g = fluid.rho_g_func(pressures[i], Z_g) 
-        rho_l = fluid.rho_l_func(R_sl, B_l) 
-        rho_o = fluid.rho_o_func(R_so, B_o)
-        
-        visc_g = fluid.visc_g_func(rho_g) 
-        visc_o = fluid.visc_o_func(pressures[i], R_so)
-        visc_w = fluid.visc_w_func(pressures[i])
-        
-        B_g = fluid.rho_g0/rho_g     
-        
-        # find superficial velocities **
-        j_g = B_g*model.j_o0*(fluid.GOR-R_so)    #TODO: change to local GOR (if local GOR should be used??)
-        j_o = model.j_o0*B_o
-        j_w = model.j_o0*fluid.get_local_WOR(B_w, B_o)*B_w
-        j_l = j_o + j_w
-        j   = j_l + j_g
-        
-        # void and liquid fractions
-        if void_frac_method=="Bendiksen":
-            Cd, Ud = model.Bendiksen(j)
-        else: #woldesmayat and Gayar (prevously had bug for large N caused by P>P_pb.. =>.. R_so=GOR.. =>.. j_g=0)
-            Cd, Ud = model.woldesemayat_ghajar(pressures[i], j, j_g, j_l, rho_g, rho_l, R_so) #woldesmayat and Gayar
-        void_frac = model.void_frac_func(j, j_g, Cd, Ud) #*
-        w_frac = model.liquid_k_frac(j_w, j_o, void_frac)
-        o_frac = model.liquid_k_frac(j_o, j_w, void_frac)
-
-        #save properties
-        WOR_list[i] = fluid.get_local_WOR(B_w, B_o)
-        wc_list[i] = fluid.get_local_wc(WOR_list[i])
-
-        w_frac_list[i] = w_frac
-        void_frac_list[i] = void_frac
-        oil_frac_list[i] = o_frac
-
-        q_l_list[i] = j_l*np.pi*pipe.D**2 / 4
-        q_w_list[i] = j_w*np.pi*pipe.D**2 / 4
-        q_g_list[i] = j_g*np.pi*pipe.D**2 / 4
-        q_o_list[i] = j_o*np.pi*pipe.D**2 / 4
-
-        # at SC
-
-        q_g0_list[i] = q_g_list[i] / B_g + (q_o_list[i] * R_so) / B_o
-        q_o0_list[i] = q_o_list[i]/B_o #+ (q_g_list[i] * R_so) / B_g # q_g_list[i]/(B_g*(fluid.GOR + 1/R_so))
-        q_w0_list[i] = q_w_list[i]/B_w
-        q_l0_list[i] = q_o0_list[i]+q_w0_list[i]
-
-    
-    return WOR_list, wc_list, w_frac_list, void_frac_list, oil_frac_list, q_l_list, q_w_list, q_g_list, q_o_list, q_l0_list, q_w0_list, q_g0_list, q_o0_list
-
-BWOR_list, Bwc_list, Bw_frac_list, Bvoid_frac_list, Boil_frac_list, Bq_l_list, Bq_w_list, Bq_g_list, Bq_o_list, Bq_l0_list,  Bq_w0_list, Bq_g0_list, Bq_o0_list = computePipe(B_pressures, "Bendiksen")
-WGWOR_list, WGwc_list, WGw_frac_list, WGvoid_frac_list, WGoil_frac_list, WGq_l_list, WGq_w_list, WGq_g_list, WGq_o_list, WGq_l0_list, WGq_w0_list, WGq_g0_list, WGq_o0_list = computePipe(B_pressures, "VG")
-
-# print values at input and output for comparison
-print("pressure at input with Bendiksen is :", B_pressures[0])
-print("pressure at input with Woldesmayat and Gajar is :", WG_pressures[0])
-print("pressure at input with MLE is :", MLE_pressures[0])
-"""
-print(" the pressure difference with Bendiksen is: ", (B_pressures[0]- B_pressures[-1])/100000, "bar")
-print(" the pressure difference with W&G is: ", (WG_pressures[0]- WG_pressures[-1])/100000, "bar")
-
-print("local oil flowrate at input and output is :", Bq_o_list[0], "and", Bq_o_list[-1])
-
-print("local gas flowrate at input and output is :", Bq_g_list[0], "and", Bq_g_list[-1])
-
-print("local water flowrate at input and output is :", Bq_w_list[0], "and", Bq_w_list[-1])
-
-print("void fraction estimated at input and output with Bendiksen is :", Bvoid_frac_list[0], "and", Bvoid_frac_list[-1])
-print("void fraction estimated at input and output with Woldesmayat and Gajar is :", WGvoid_frac_list[0], "and", WGvoid_frac_list[-1])
-"""
-# ------- plotting ----------
-x_list = pipe.x
-
-# -- plot the pressure through the pipe --
-fig = plt.figure()
-plt.title('Pressure through pipe')
-plt.plot(x_list, B_pressures, 'b--', label='Bendiksen')
-plt.plot(x_list, WG_pressures, 'r-.', label='Woldesmayat and Ghajar')
-plt.plot(x_list, MLE_pressures, 'g-.', label='MLE')
-plt.ylabel('Pressure [Pa]')
-plt.xlabel('Position [m]')
-plt.legend()
-fig.savefig('results/pressureplot.png')
-
-# -- void fraction --
-fig = plt.figure()
-plt.title('Void fraction through pipe')
-plt.plot(x_list, Bvoid_frac_list, 'b--', label='Bendiksen')
-plt.plot(x_list, WGvoid_frac_list, 'r-.', label='Woldesmayat and Ghajar')
-plt.ylim(ymax = 1, ymin = 0)
-plt.ylabel('Void fraction [-]')
-plt.xlabel('Position [m]')
-plt.legend()
-fig.savefig('results/voidfractionplot.png')
-
-fig = plt.figure()
-plt.title('Void fraction through pipe (zoomed)')
-plt.plot(x_list, Bvoid_frac_list, 'b--', label='Bendiksen')
-plt.plot(x_list, WGvoid_frac_list, 'r-.', label='Woldesmayat and Ghajar')
-#plt.ylim(ymax = 1, ymin = 0)
-plt.ylabel('Void fraction [-]')
-plt.xlabel('Position [m]')
-plt.legend()
-fig.savefig('results/voidfractionplotzoomed.png')
-
-# -- oil fraction --
-fig = plt.figure()
-plt.title('Oil fraction through pipe')
-plt.plot(x_list, Boil_frac_list, 'b--', label='Bendiksen')
-plt.plot(x_list, WGoil_frac_list, 'r-.', label='Woldesmayat and Ghajar')
-plt.ylim(ymax = 1, ymin = 0)
-plt.ylabel('Oil Fraction [-]')
-plt.xlabel('Position [m]')
-plt.legend()
-fig.savefig('results/oilfractionplot.png')
-
-fig = plt.figure()
-plt.title('Oil fraction through pipe (zoomed)')
-plt.plot(x_list, Boil_frac_list, 'b--', label='Bendiksen')
-plt.plot(x_list, WGoil_frac_list, 'r-.', label='Woldesmayat and Ghajar')
-#plt.ylim(ymax = 1, ymin = 0)
-plt.ylabel('Oil Fraction [-]')
-plt.xlabel('Position [m]')
-plt.legend()
-fig.savefig('results/oilfractionplotzoomed.png')
-
-# -- wc (should be constant) --
-fig = plt.figure()
-plt.title('Water Cut through pipe')
-plt.plot(x_list, Bwc_list, 'b--', label='Bendiksen')
-plt.plot(x_list, WGwc_list, 'r-.', label='Woldesmayat and Ghajar')
-plt.ylim(ymax = 1, ymin = 0)
-plt.ylabel('Water Cut[-]')
-plt.xlabel('Position [m]')
-plt.legend()
-fig.savefig('results/wcplot.png')
-
-fig = plt.figure()
-plt.title('Water Cut through pipe (zoomed)')
-plt.plot(x_list, Bwc_list, 'b--', label='Bendiksen')
-plt.plot(x_list, WGwc_list, 'r-.', label='Woldesmayat and Ghajar')
-plt.ylabel('Water Cut[-]')
-plt.xlabel('Position [m]')
-plt.legend()
-fig.savefig('results/wcplotzoomed.png')
-
-# -- total fractions through pipe --
-
-fig = plt.figure()
-plt.title('All phase fractions with best method')
-plt.plot(x_list, WGw_frac_list, 'b', label='water fraction')
-plt.plot(x_list, WGoil_frac_list, 'k', label='oil fraction')
-plt.plot(x_list, WGvoid_frac_list, 'r', label='void fraction')
-plt.ylim(ymax = 1, ymin = 0)
-plt.ylabel('Fraction [-]')
-plt.xlabel('Position [m]')
-plt.legend()
-fig.savefig('results/totalfractionplot.png')
-
-# -- flowrates local conditions
-
-fig = plt.figure()
-plt.title('Water flowrate through pipe at local conditions')
-plt.plot(x_list, Bq_w_list, 'b--', label='Bendiksen')
-plt.plot(x_list, WGq_w_list, 'r-.', label='Woldesmayat and Ghajar')
-plt.ylabel('Water flowrate [m^3/s]')
-plt.xlabel('Position [m]')
-plt.legend()
-fig.savefig('results/waterflowrateplot.png')
-
-# -- oil flowrate at SC --
-fig = plt.figure()
-plt.title('Oil flowrate through pipe at local conditions')
-plt.plot(x_list, Bq_o_list, 'b--', label='Bendiksen')
-plt.plot(x_list, WGq_o_list, 'r-.', label='Woldesmayat and Ghajar')
-plt.ylabel('Oil flowrate [m^3/s]')
-plt.xlabel('Position [m]')
-plt.legend()
-fig.savefig('results/oilflowrateplot.png')
-
-# -- gas flowrate at SC --
-fig = plt.figure()
-plt.title('Gas flowrate through pipe at local conditions')
-plt.plot(x_list, Bq_g_list, 'b--', label='Bendiksen')
-plt.plot(x_list, WGq_g_list, 'r-.', label='Woldesmayat and Ghajar')
-plt.ylabel('Oil flowrate [m^3/s]')
-plt.xlabel('Position [m]')
-plt.legend()
-fig.savefig('results/gasflowrateplot.png')
-
-
-# --- flowrates standard conditions ---
-
-# -- water flowrate at SC --
-fig = plt.figure()
-plt.title('Water flowrate through pipe at SC')
-plt.plot(x_list, Bq_w0_list, 'b--', label='Bendiksen')
-plt.plot(x_list, WGq_w0_list, 'r-.', label='Woldesmayat and Ghajar')
-plt.ylabel('Water flowrate [sm^3/s]')
-plt.xlabel('Position [m]')
-plt.legend()
-fig.savefig('results/waterflowrateSCplot.png')
-
-# -- oil flowrate at SC --
-fig = plt.figure()
-plt.title('Oil flowrate through pipe at SC')
-plt.plot(x_list, Bq_o0_list, 'b--', label='Bendiksen')
-plt.plot(x_list, WGq_o0_list, 'r-.', label='Woldesmayat and Ghajar')
-plt.ylabel('Oil flowrate [sm^3/s]')
-plt.xlabel('Position [m]')
-plt.legend()
-fig.savefig('results/oilflowrateSCplot.png')
-
-# -- gas flowrate at SC --
-fig = plt.figure()
-plt.title('Gas flowrate through pipe at SC')
-plt.plot(x_list, Bq_g0_list, 'b--', label='Bendiksen')
-plt.plot(x_list, WGq_g0_list, 'r-.', label='Woldesmayat and Ghajar')
-plt.ylabel('Oil flowrate [sm^3/s]')
-plt.xlabel('Position [m]')
-plt.legend()
-fig.savefig('results/gasflowrateSCplot.png')
 
